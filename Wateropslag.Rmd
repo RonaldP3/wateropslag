@@ -35,7 +35,12 @@ neerslag <- read.csv("KNMI_20161231(2).txt",
   # Verwijder cellen zonder invoer (NA)
   filter(!is.na(neerslag))
 
+# Maak stationsindicatie numerisch
 neerslag$station <- as.numeric(as.character(neerslag$station))
+
+# Beperk de lijst met coordinaten tot diegene die ook in de neerslaggegevens
+# voorkomen.
+stations <- filter(stations, STN %in% neerslag$station)
 
 # Configureer datumnotatie
 neerslag$datum <- as.character(neerslag$datum)
@@ -173,11 +178,7 @@ renderTable({select(stations,
 
 ### Neerslagoverzicht
 
-```{r neerslagoverzicht}
-
-nummer <- reactive({
-  input$station
-})
+```{r neerslagberekening}
 
 # Maak selecetie op huidige station
 selectie <- reactive({
@@ -216,6 +217,13 @@ droog <- reactive({
          maand >= input$droge_maanden[1],
          maand <= input$droge_maanden[2])
   })
+```
+
+De onderstaande figuur laat het neerslagverloop zien voor het gekozen weerstation. Op de horizontale as staan de maanden van het jaar en op de verticale as staat de maandelijkse neerslag in milimeter. Het droogste neerslagscenario is weergegeven met de **rode** lijn. Dit is een aanschakeling van de droogste maanden van de afgelopen `r max(as.numeric(neerslag$jaar) - min(as.numeric(neerslag$jaar)))` jaar. De **zwarte** lijn laat de gemiddelde maandelijkse neerslag zien in diezelfde periode. De **blauwe** lijn laat het natste neerslagscenario zien, als de aaneenschakeling van de natste maanden.
+
+De **lichtblauwe arcering** laat het neerslagverschil zien tussen het droogste neerslagscenario en het gemiddelde neerslagniveau in de geselecteerde periode.
+
+```{r neerslagoverzicht, fig.width=10, fig.height=3}
 
 # Maak plot
 renderPlot({
@@ -243,18 +251,17 @@ renderPlot({
     geom_ribbon(data = droog(),
                 aes(x = maand,
                     ymin = minimum,
-                    ymax = gemiddelde,
-                    alpha = 0.6,
-                fill = "blue")) +
+                    ymax = gemiddelde),
+                alpha = 0.5,
+                fill = "lightblue") +
     theme_bw()
   print(p)
-})
+},
+height = 500)
 
 
 # Volgende keer: filter samenvatting() op de te overbruggen maanden. Moet weer reactive.
-# - beperk labels in kaart tot stations gebruikt in station keuzemenu.
 # - bereken verschil tussen droogst en gemiddeld.
-# - breng arcering aan in grafiek, lichtblauw tussen gemiddeld en minimum in geselecteerde maanden.
 # - corrigeer x-as notatie
 ```
 
@@ -264,21 +271,8 @@ renderPlot({
 ```{r Test}
 
 # renderTable({samenvatting()})
-
 renderTable({droog()})
 
-# renderTable({filter(data = samenvatting(),
-#                               maand >= input$droge_maanden[1],
-#                               maand <= input$droge_maanden[2])})
-
-# renderPlot({
-#   p +
-#     geom_ribbon(data = droog(),
-#                 aes(x = maand,
-#                     ymin = minimum,
-#                     ymax = gemiddelde))
-#   print(p)
-# })
 
 ```
 
