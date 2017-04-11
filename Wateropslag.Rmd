@@ -1,0 +1,284 @@
+---
+title: "Wateropslag"
+output: 
+  flexdashboard::flex_dashboard:
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+
+library(flexdashboard)
+library(dplyr)
+library(ggplot2)
+library(sp)
+library(shiny)
+
+# Bepaal instelling voor codeblokken
+knitr::opts_chunk$set(echo = FALSE,
+                      warning = FALSE,
+                      message = FALSE)
+
+# Maak werkomgeving leeg
+rm(list = ls())
+
+# Lees coordinaten weerstations
+stations <- read.csv("Stationscoordinaten.csv")
+
+# Lees weersgegevens
+neerslag <- read.csv("KNMI_20161231(2).txt",
+                     skip = 59,
+                     header = TRUE) %>%
+  # Selecteer alleen neerslaggegevens
+  select(station = X..STN,
+         datum = YYYYMMDD,
+         neerslag = RH) %>%
+  # Verwijder cellen zonder invoer (NA)
+  filter(!is.na(neerslag))
+
+neerslag$station <- as.numeric(as.character(neerslag$station))
+
+# Configureer datumnotatie
+neerslag$datum <- as.character(neerslag$datum)
+neerslag$datum <- as.Date(neerslag$datum,
+                          "%Y%m%d")
+# Verkrijg de maand
+neerslag$jaar <- format.Date(neerslag$datum,
+                             "%Y")
+neerslag$maand <- format.Date(neerslag$datum,
+                              "%m")
+neerslag$maand <- as.numeric(neerslag$maand)
+
+# Een etmaalsom van de neerslag (in 0.1 mm) <0.05 mm krijgt de notatie -1.
+# Corrigeer naar 0
+neerslag$neerslag[neerslag$neerslag == -1] <- 0
+# Vermenigvuldig met 0.1
+neerslag$neerslag <- neerslag$neerslag * 0.1
+
+```
+
+
+Inputs {.sidebar}
+-------------------------------------
+
+```{r gebruiksinvoer}
+
+#------------------------------------------------------------------------------
+# Kies weerstation
+
+# Maak station factor
+neerslag$station <- factor(neerslag$station)
+# Sla stationskeuzes op
+stations.keuzes <- levels(neerslag$station)
+
+selectInput("station",
+            label = "Kies weerstation:",
+            choices = stations.keuzes,
+            selected = 269)
+
+
+#------------------------------------------------------------------------------
+# Kies de te overbruggen maanden
+
+sliderInput("droge_maanden",
+            label = "Kies droge maanden:",
+            min = 1,
+            max = 12,
+            value = c(7, 9),
+            step = 1)
+
+#------------------------------------------------------------------------------
+# Numerieke invoer
+
+# Tuinoppervlak
+numericInput("tuin",
+             label = 'Tuinoppervlak (m\\(^2\\)):',
+             min = 10,
+             max = 1000,
+             value = 20,
+             step = 1)
+
+# Dakoppervlak
+numericInput("dak",
+             label = 'Dakoppervlak (m\\(^2\\)):',
+             min = 10,
+             max = 500,
+             value = 100,
+             step = 1)
+
+# Capaciteit wateropslag
+# Dakoppervlak
+numericInput("opslag",
+             label = 'Capaciteit wateropslag (liter):',
+             min = 10,
+             max = 10000,
+             value = 500,
+             step = 1)
+
+```  
+
+
+Column {.tabset}
+-----------------------------------------------------------------------
+
+### Weerstationkaart
+
+```{r weerstationkaart}
+
+# Laad kaart van Nederland
+NLD <- readRDS("NLD_adm1.rds")
+
+# Verwijder Zeeuwse meren en IJsselmeer. Worden anders ook getekend en ingekleurd.
+NLD_fixed <- subset(NLD,
+                    !NLD$NAME_1  %in% c("Zeeuwse meren", "IJsselmeer"))
+
+# Maak kaart leesbaar voor ggplot
+NLD_fixed <- broom::tidy(NLD_fixed)
+
+# Maak de kaart
+ggplot(NLD_fixed) +
+  geom_polygon( aes(x = long,
+                    y = lat,
+                    group = group),
+                color = "black",   # Lijnen
+                fill = "grey80") + # Inkleuring
+  coord_map() +
+  # Plot weerstations met labels
+  geom_point(data = stations,
+             aes(x = LON.east.,
+                 y = LAT.north.)) +
+  geom_label(data = stations,
+             aes(x = LON.east.,
+                 y = LAT.north. + 0.07,
+                 check_overlap = TRUE,
+                 label = STN),
+             size = 2,
+             label.padding = unit(0.1, "lines"),
+             colour = "blue")+
+  theme_bw()
+
+
+```
+
+
+### Weerstationlijst
+
+```{r weerstationlijst}
+
+renderTable({select(stations,
+                    nummer = STN,
+                    naam = NAME)})
+
+```
+
+
+### Neerslagoverzicht
+
+```{r neerslagoverzicht}
+
+nummer <- reactive({
+  input$station
+})
+
+# Maak selecetie op huidige station
+selectie <- reactive({
+  filter(neerslag,
+         station == input$station)
+})
+
+# Berekend neerslag per maand
+maandsom <- reactive({
+  summarise(group_by(selectie(),
+                     jaar,
+                     maand),
+            som = sum(neerslag))
+})
+
+# Maak neerslagsamenvatting
+samenvatting <- reactive({
+  summarise(group_by(maandsom(),
+                     maand),
+            minimum = min(som),
+            gemiddelde = mean(som),
+            maximum = max(som))
+})
+
+# Hervorm tot lange vorm
+samenvatting2 <- reactive({
+  tidyr::gather(samenvatting(),
+                key = type,
+                value = waarde,
+                2:4)
+})
+
+# Selectie met alleen droge maanden
+droog <- reactive({
+  filter(samenvatting(),
+         maand >= input$droge_maanden[1],
+         maand <= input$droge_maanden[2])
+  })
+
+# Maak plot
+renderPlot({
+  p <- ggplot() +
+    ggtitle(paste0(toString(input$station),
+                   " - ",
+                   stations$NAME[stations$STN == input$station])) +
+    xlab("maand") +
+    ylab("neerslag (mm)") +
+    xlim(c(1, 12)) +
+    # Teken punten
+    geom_point(data = samenvatting2(),
+              aes(x = maand,
+                  y = waarde)) +
+    # Teken lijnen
+    geom_line(data = samenvatting2(),
+              aes(x = maand,
+                  y = waarde,
+                  colour = type)) +
+    # Stel lijnkleuren in
+    scale_colour_manual(values = c("black",
+                                   "blue",
+                                   "red")) +
+    # Teken arcering
+    geom_ribbon(data = droog(),
+                aes(x = maand,
+                    ymin = minimum,
+                    ymax = gemiddelde,
+                    alpha = 0.6,
+                fill = "blue")) +
+    theme_bw()
+  print(p)
+})
+
+
+# Volgende keer: filter samenvatting() op de te overbruggen maanden. Moet weer reactive.
+# - beperk labels in kaart tot stations gebruikt in station keuzemenu.
+# - bereken verschil tussen droogst en gemiddeld.
+# - breng arcering aan in grafiek, lichtblauw tussen gemiddeld en minimum in geselecteerde maanden.
+# - corrigeer x-as notatie
+```
+
+
+### Test
+
+```{r Test}
+
+# renderTable({samenvatting()})
+
+renderTable({droog()})
+
+# renderTable({filter(data = samenvatting(),
+#                               maand >= input$droge_maanden[1],
+#                               maand <= input$droge_maanden[2])})
+
+# renderPlot({
+#   p +
+#     geom_ribbon(data = droog(),
+#                 aes(x = maand,
+#                     ymin = minimum,
+#                     ymax = gemiddelde))
+#   print(p)
+# })
+
+```
+
