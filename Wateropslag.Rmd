@@ -254,6 +254,8 @@ renderPlot({
                     ymax = gemiddelde),
                 alpha = 0.5,
                 fill = "lightblue") +
+    # Voeg labels toe
+    scale_x_continuous(breaks = 1:12) +
     theme_bw()
   print(p)
 },
