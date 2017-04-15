@@ -268,13 +268,24 @@ height = 500)
 ```
 
 
-### Test
+### Wateropslag
 
-```{r Test}
+```{r neerslagverschil}
 
 # renderTable({samenvatting()})
-renderTable({droog()})
+# renderTable({droog()})
 
+# Bereken verschil in neerslag in droge periode en gemiddelde periode (mm).
+verschil <- reactive({
+  sum(droog()$gemiddelde) - sum(droog()$minimum)
+})
+
+# Opslag in liters (werkt alleen bij oppervlak in m^2 en neerslag in mm)
+opslag <-reactive({
+  verschil() * input$tuin
+})
 
 ```
+
+Voor weerstation `r renderText({toString(input$station)})` is het verschil tussen een gemiddeld neerslagjaar en het droogste scenario **`r renderText({round(verschil(), 1)})`** milimeter. Bij een tuinoppervlak van `r renderText({input$tuin})` m^2^ is een opslag van **`r renderText({round(opslag(), 0)})`** liter nodig om het neerslagverschil te overbruggen.
 
