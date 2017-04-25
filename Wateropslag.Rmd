@@ -115,8 +115,15 @@ numericInput("dak",
 
 Column {.tabset}
 -----------------------------------------------------------------------
+### Uitleg
 
-### Weerstationkaart
+Op deze interactieve website kun je laten uitrekenen hoeveel water je in opslag moet hebben, voor bijvoorbeeld het bewateren van je tuin, om in een droog jaar genoeg water achter de hand te hebben om het neerslagverschil aan te vullen tot het niveau van een gemiddeld jaar. De gegevens zijn afkomstig van  het Koninklijk Nederlands Meteorologisch Insituut ([KNMI](http://projects.knmi.nl/klimatologie/daggegevens/selectie.cgi)) en bevat neerslaggegevens van de laatste `r max(as.numeric(neerslag$jaar) - min(as.numeric(neerslag$jaar)))` jaar.     
+
+Voer links het oppervlak van je tuin in en het oppervlak wat je tot je beschikking hebt om water op te vangen, hier genaamd het dakoppervlak. Kies daarna de maanden waarvoor je denkt wateropslag nodig te hebben. Als hulpmiddel bij het kiezen van een weerstation kun je in het tabblad **Weerstationskaart** een kaart van Nederland zien met daarop aangegeven alle weerstationsnummers. Indien nodig kun je op het tabblad **Weerstationslijst** een lijst zien met weerstationsnummers en plaatsnamen.    
+
+Vervolgens kun je op het tabblad **Neerslagoverzicht** de neerslaggegevens zien voor het gekozen weerstation en wordt op het tabblad **Wateropslag** de wateropslag berekeningen gepresenteerd.
+
+### Weerstationskaart
 
 ```{r weerstationkaart}
 
@@ -156,7 +163,7 @@ ggplot(NLD_fixed) +
 ```
 
 
-### Weerstationlijst
+### Weerstationslijst
 
 ```{r weerstationlijst}
 
